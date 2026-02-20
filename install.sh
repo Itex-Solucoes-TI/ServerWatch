@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Se estiver sendo executado via pipe (curl | bash), baixa e re-executa
+if [ -p /dev/stdin ]; then
+  TMP=$(mktemp /tmp/sw-install.XXXXXX.sh)
+  cat > "$TMP"
+  bash "$TMP"
+  rm -f "$TMP"
+  exit $?
+fi
+
 REPO_URL="https://raw.githubusercontent.com/Itex-Solucoes-TI/ServerWatch/main"
 INSTALL_DIR="/opt/serverwatch"
 
