@@ -3,7 +3,6 @@ set -e
 
 REPO_URL="https://raw.githubusercontent.com/Itex-Solucoes-TI/ServerWatch/main"
 INSTALL_DIR="/opt/serverwatch"
-COMPOSE_FILE="$INSTALL_DIR/docker-compose.yml"
 ENV_FILE="$INSTALL_DIR/.env"
 
 RED='\033[0;31m'
@@ -18,7 +17,7 @@ echo "================================================"
 echo ""
 
 # Verifica dependências
-for cmd in docker curl; do
+for cmd in docker curl openssl; do
   if ! command -v $cmd &>/dev/null; then
     echo -e "${RED}Erro: '$cmd' não encontrado. Instale e tente novamente.${NC}"
     exit 1
@@ -30,9 +29,17 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
-# Coleta configurações
+# Lê do terminal mesmo quando executado via pipe (curl | bash)
+exec < /dev/tty
+
 echo -e "${YELLOW}Configure a instalação (Enter para usar o valor padrão):${NC}"
 echo ""
+
+read -p "Seu usuário do Docker Hub: " DOCKERHUB_USER
+if [ -z "$DOCKERHUB_USER" ]; then
+  echo -e "${RED}Usuário do Docker Hub é obrigatório.${NC}"
+  exit 1
+fi
 
 read -p "Nome da empresa [Minha Empresa]: " COMPANY_NAME
 COMPANY_NAME="${COMPANY_NAME:-Minha Empresa}"
@@ -41,7 +48,7 @@ read -p "Email do administrador [admin@empresa.com]: " ADMIN_EMAIL
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@empresa.com}"
 
 while true; do
-  read -s -p "Senha do administrador: " ADMIN_PASSWORD
+  read -s -p "Senha do administrador (mín. 6 caracteres): " ADMIN_PASSWORD
   echo ""
   if [ ${#ADMIN_PASSWORD} -ge 6 ]; then
     break
@@ -55,9 +62,6 @@ PORT="${PORT:-80}"
 read -p "Versão a instalar [latest]: " VERSION
 VERSION="${VERSION:-latest}"
 
-read -p "Seu usuário do Docker Hub [itex]: " DOCKERHUB_USER
-DOCKERHUB_USER="${DOCKERHUB_USER:-itex}"
-
 # Gera secrets aleatórios
 DB_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 48)
@@ -68,9 +72,9 @@ mkdir -p "$INSTALL_DIR"
 # Baixa o docker-compose de produção
 echo ""
 echo "Baixando arquivos de configuração..."
-curl -fsSL "$REPO_URL/docker-compose.prod.yml" -o "$COMPOSE_FILE"
+curl -fsSL "$REPO_URL/docker-compose.prod.yml" -o "$INSTALL_DIR/docker-compose.yml"
 
-# Cria o .env
+# Cria o .env com valores já resolvidos (sem variáveis aninhadas)
 cat > "$ENV_FILE" << EOF
 DOCKER_IMAGE_BACKEND=${DOCKERHUB_USER}/serverwatch-backend
 DOCKER_IMAGE_FRONTEND=${DOCKERHUB_USER}/serverwatch-frontend
@@ -87,19 +91,20 @@ EOF
 chmod 600 "$ENV_FILE"
 
 # Sobe os serviços
-echo "Iniciando ServerWatch..."
+echo "Baixando imagens e iniciando ServerWatch..."
 cd "$INSTALL_DIR"
-docker compose -f docker-compose.yml pull
-docker compose -f docker-compose.yml up -d
+docker compose pull
+docker compose up -d
+
+SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
 echo ""
 echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  ServerWatch instalado com sucesso!${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo "  Acesso: http://$(curl -s ifconfig.me 2>/dev/null || echo 'IP_DO_SERVIDOR'):${PORT}"
+echo "  Acesso: http://${SERVER_IP}:${PORT}"
 echo "  Email:  ${ADMIN_EMAIL}"
 echo ""
-echo -e "${YELLOW}  Guarde as credenciais em local seguro.${NC}"
-echo "  Arquivos em: $INSTALL_DIR"
+echo -e "${YELLOW}  Arquivos em: $INSTALL_DIR${NC}"
 echo ""
