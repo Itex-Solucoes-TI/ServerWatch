@@ -16,10 +16,9 @@ echo "       ServerWatch — Instalação"
 echo "================================================"
 echo ""
 
-# Verifica dependências
 for cmd in docker curl openssl; do
   if ! command -v $cmd &>/dev/null; then
-    echo -e "${RED}Erro: '$cmd' não encontrado. Instale e tente novamente.${NC}"
+    echo -e "${RED}Erro: '$cmd' não encontrado.${NC}"
     exit 1
   fi
 done
@@ -29,49 +28,34 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
-# Lê do terminal mesmo quando executado via pipe (curl | bash)
-exec < /dev/tty
+DOCKERHUB_USER="${SW_DOCKERHUB_USER:-jefvonmuhlen}"
+VERSION="${SW_VERSION:-latest}"
+COMPANY_NAME="${SW_COMPANY:-Minha Empresa}"
+ADMIN_EMAIL="${SW_ADMIN_EMAIL:-admin@empresa.com}"
+ADMIN_PASSWORD="${SW_ADMIN_PASSWORD:-}"
+PORT="${SW_PORT:-80}"
 
-echo -e "${YELLOW}Configure a instalação (Enter para usar o valor padrão):${NC}"
-echo ""
-
-read -p "Seu usuário do Docker Hub [jefvonmuhlen]: " DOCKERHUB_USER
-DOCKERHUB_USER="${DOCKERHUB_USER:-jefvonmuhlen}"
-
-read -p "Nome da empresa [Minha Empresa]: " COMPANY_NAME
-COMPANY_NAME="${COMPANY_NAME:-Minha Empresa}"
-
-read -p "Email do administrador [admin@empresa.com]: " ADMIN_EMAIL
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@empresa.com}"
-
-while true; do
-  read -s -p "Senha do administrador (mín. 6 caracteres): " ADMIN_PASSWORD
+if [ -z "$ADMIN_PASSWORD" ]; then
+  echo -e "${RED}Erro: SW_ADMIN_PASSWORD não definida.${NC}"
   echo ""
-  if [ ${#ADMIN_PASSWORD} -ge 6 ]; then
-    break
-  fi
-  echo -e "${RED}A senha precisa ter no mínimo 6 caracteres.${NC}"
-done
+  echo "Use:"
+  echo ""
+  echo "  SW_ADMIN_PASSWORD=suasenha \\"
+  echo "  SW_ADMIN_EMAIL=admin@empresa.com \\"
+  echo "  SW_COMPANY=\"Nome da Empresa\" \\"
+  echo "  bash <(curl -fsSL $REPO_URL/install.sh)"
+  echo ""
+  exit 1
+fi
 
-read -p "Porta de acesso web [80]: " PORT
-PORT="${PORT:-80}"
-
-read -p "Versão a instalar [latest]: " VERSION
-VERSION="${VERSION:-latest}"
-
-# Gera secrets aleatórios
 DB_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 48)
 
-# Cria diretório de instalação
 mkdir -p "$INSTALL_DIR"
 
-# Baixa o docker-compose de produção
-echo ""
 echo "Baixando arquivos de configuração..."
 curl -fsSL "$REPO_URL/docker-compose.prod.yml" -o "$INSTALL_DIR/docker-compose.yml"
 
-# Cria o .env com valores já resolvidos (sem variáveis aninhadas)
 cat > "$ENV_FILE" << EOF
 BACKEND_IMAGE=${DOCKERHUB_USER}/serverwatch-backend:${VERSION}
 FRONTEND_IMAGE=${DOCKERHUB_USER}/serverwatch-frontend:${VERSION}
@@ -86,13 +70,12 @@ EOF
 
 chmod 600 "$ENV_FILE"
 
-# Sobe os serviços
 echo "Baixando imagens e iniciando ServerWatch..."
 cd "$INSTALL_DIR"
 docker compose pull
 docker compose up -d
 
-SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+SERVER_IP=$(curl -s --max-time 3 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
 echo ""
 echo -e "${GREEN}================================================${NC}"
