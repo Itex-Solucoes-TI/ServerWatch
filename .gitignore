@@ -27,6 +27,9 @@ dist/
 pgdata/
 *.log
 
+# Licença - chave privada nunca commitar
+**/license_private.pem
+
 # Build / cache
 *.pyc
 .cache/

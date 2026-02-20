@@ -1,12 +1,16 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from passlib.context import CryptContext
 from jose import jwt, JWTError
+
 from app.deps import get_session, get_current_user
 from app.schemas.auth import LoginRequest, RefreshRequest, LoginResponse, SwitchRequest
 from app.services.auth_service import create_tokens
 from app.models.user import User, UserCompanyRole
 from app.models.company import Company
+from app.models.license import InstallationLicense
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -30,7 +34,19 @@ def login(data: LoginRequest, session: Session = Depends(get_session)):
     ).all()
 
     role_map = {r.company_id: r.role for r in roles}
+    today = date.today()
+    lic = session.exec(select(InstallationLicense).limit(1)).first()
+    needs_license = not lic or not (lic.valid_until and lic.valid_until >= today)
+
     tokens = create_tokens(user.id)
+    companies_data = [
+        {
+            "id": c.id, "name": c.name, "slug": c.slug, "role": role_map.get(c.id),
+            "license_valid": not needs_license,
+            "license_valid_until": lic.valid_until.isoformat() if lic and lic.valid_until else None,
+        }
+        for c in companies
+    ]
     return LoginResponse(
         access_token=tokens["access_token"],
         refresh_token=tokens["refresh_token"],
@@ -40,7 +56,8 @@ def login(data: LoginRequest, session: Session = Depends(get_session)):
             "email": user.email,
             "is_superadmin": user.is_superadmin,
         },
-        companies=[{"id": c.id, "name": c.name, "slug": c.slug, "role": role_map.get(c.id)} for c in companies],
+        companies=companies_data,
+        needs_license=needs_license,
     )
 
 

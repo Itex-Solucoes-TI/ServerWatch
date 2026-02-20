@@ -3,6 +3,8 @@ services:
     image: postgres:15-alpine
     restart: always
     network_mode: host
+    security_opt:
+      - apparmor=unconfined
     environment:
       POSTGRES_DB: serverwatch
       POSTGRES_USER: serverwatch
@@ -19,6 +21,8 @@ services:
     image: ${BACKEND_IMAGE:-jefvonmuhlen/serverwatch-backend:latest}
     restart: always
     network_mode: host
+    security_opt:
+      - apparmor=unconfined
     environment:
       DATABASE_URL: postgresql://serverwatch:${DB_PASSWORD}@localhost/serverwatch
       JWT_SECRET: ${JWT_SECRET}
@@ -36,6 +40,8 @@ services:
     image: ${FRONTEND_IMAGE:-jefvonmuhlen/serverwatch-frontend:latest}
     restart: always
     network_mode: host
+    security_opt:
+      - apparmor=unconfined
     depends_on:
       - backend
 

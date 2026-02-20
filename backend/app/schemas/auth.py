@@ -19,3 +19,4 @@ class LoginResponse(BaseModel):
     refresh_token: str
     user: dict
     companies: list
+    needs_license: bool = False

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { login as apiLogin } from '../api/auth'
+import { activate as apiActivateLicense } from '../api/license'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -8,7 +9,8 @@ export const useAuthStore = defineStore('auth', {
     user: null,
     companies: [],
     companyId: null,
-    currentRole: null, // role do usuário na empresa selecionada
+    currentRole: null,
+    needsLicense: false,
   }),
   persist: true,
   getters: {
@@ -27,6 +29,15 @@ export const useAuthStore = defineStore('auth', {
       this.companies = data.companies
       this.companyId = data.companies[0]?.id ?? null
       this.currentRole = data.companies[0]?.role ?? null
+      this.needsLicense = data.needs_license ?? false
+    },
+    async activateLicense(token) {
+      const { data } = await apiActivateLicense(token)
+      this.companies.forEach((c) => {
+        c.license_valid = true
+        c.license_valid_until = data.valid_until
+      })
+      this.needsLicense = false
     },
     setCompany(id, role) {
       this.companyId = id
@@ -47,6 +58,7 @@ export const useAuthStore = defineStore('auth', {
       this.companies = []
       this.companyId = null
       this.currentRole = null
+      this.needsLicense = false
     },
   },
 })

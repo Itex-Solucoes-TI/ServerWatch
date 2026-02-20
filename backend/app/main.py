@@ -5,7 +5,7 @@ from app.database import create_db_and_tables
 from app.seed import run_seed
 from app.scheduler import start_scheduler
 from app.config import settings
-from app.routers import auth, companies, users, servers, routers_api
+from app.routers import auth, companies, users, servers, routers_api, license
 from app.routers import network, topology, checks, notifications, company_settings
 from app.routers import docker_api, health, dashboard, ws
 
@@ -30,6 +30,7 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(license.router, prefix="/api")
 app.include_router(companies.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(servers.router, prefix="/api")

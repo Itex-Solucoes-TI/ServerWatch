@@ -43,7 +43,7 @@ function openNew() {
 
 function openEdit(c) {
   editCompany.value = c
-  form.value = { name: c.name, slug: c.slug, cnpj: c.cnpj || '' }
+  form.value = { name: c.name, slug: c.slug, cnpj: maskCnpj(c.cnpj || '') }
   showForm.value = true
 }
 
@@ -51,7 +51,39 @@ function onNameChange() {
   if (!editCompany.value) form.value.slug = slugify(form.value.name)
 }
 
+function maskCnpj(val) {
+  const d = (val || '').replace(/\D/g, '').slice(0, 14)
+  if (d.length <= 2) return d
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+}
+
+function onCnpjInput(e) {
+  const v = maskCnpj(e.target.value)
+  if (v !== form.value.cnpj) form.value.cnpj = v
+}
+
+function isValidCnpj(val) {
+  const d = (val || '').replace(/\D/g, '')
+  if (d.length !== 14) return false
+  if (/^(\d)\1+$/.test(d)) return false
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  const sum = (arr, w) => arr.reduce((s, n, i) => s + n * w[i], 0)
+  const nums = d.split('').map(Number)
+  const d1 = sum(nums.slice(0, 12), w1) % 11
+  const d2 = sum(nums.slice(0, 13), w2) % 11
+  return (d1 < 2 ? 0 : 11 - d1) === nums[12] && (d2 < 2 ? 0 : 11 - d2) === nums[13]
+}
+
 async function save() {
+  const cnpj = (form.value.cnpj || '').trim()
+  if (cnpj && !isValidCnpj(cnpj)) {
+    toast.error('CNPJ inválido')
+    return
+  }
   try {
     if (editCompany.value) {
       await update(editCompany.value.id, form.value)
@@ -114,7 +146,7 @@ async function save() {
         </div>
         <div>
           <label class="block text-sm text-gray-600 mb-1">CNPJ</label>
-          <input v-model="form.cnpj" class="w-full border rounded px-3 py-2" placeholder="00.000.000/0000-00" />
+          <input v-model="form.cnpj" @input="onCnpjInput" class="w-full border rounded px-3 py-2" placeholder="00.000.000/0000-00" maxlength="18" />
         </div>
         <div class="flex gap-2">
           <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg">{{ editCompany ? 'Salvar' : 'Criar' }}</button>

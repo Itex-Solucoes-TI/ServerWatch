@@ -63,7 +63,7 @@ JWT_SECRET=${JWT_SECRET}
 DEFAULT_COMPANY_NAME=Minha Empresa
 DEFAULT_ADMIN_EMAIL=admin@empresa.com
 DEFAULT_ADMIN_PASSWORD=admin123
-PORT=80
+PORT=8080
 CORS_ORIGINS=*
 EOF
 
@@ -81,7 +81,7 @@ echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  ServerWatch instalado com sucesso!${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo "  Acesso: http://${SERVER_IP}"
+echo "  Acesso: http://${SERVER_IP}:8080"
 echo "  Email:  admin@empresa.com"
 echo "  Senha:  admin123"
 echo ""

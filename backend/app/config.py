@@ -5,6 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://serverwatch:serverwatch123@localhost/serverwatch"
     JWT_SECRET: str = "troque-em-producao"
+    LICENSE_PUBLIC_KEY_PATH: str = "keys/license_public.pem"
     DEFAULT_COMPANY_NAME: str = "Minha Empresa"
     DEFAULT_ADMIN_EMAIL: str = "admin@empresa.com"
     DEFAULT_ADMIN_PASSWORD: str = "admin123"

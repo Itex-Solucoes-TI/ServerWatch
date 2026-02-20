@@ -54,11 +54,13 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
   if (to.meta.public) {
-    if (auth.token && to.path === '/login') next('/dashboard')
-    else if (auth.token && to.path === '/select-company' && auth.companyId) next('/dashboard')
+    if (auth.token && to.path === '/login' && !auth.needsLicense) next('/dashboard')
+    else if (auth.token && auth.needsLicense && to.path !== '/login') next('/login')
+    else if (auth.token && to.path === '/select-company' && auth.companyId && !auth.needsLicense) next('/dashboard')
     else next()
   } else if (auth.token) {
-    if (!auth.companyId && to.path !== '/select-company') next('/select-company')
+    if (auth.needsLicense) next('/login')
+    else if (!auth.companyId && to.path !== '/select-company') next('/select-company')
     else next()
   } else {
     next('/login')
