@@ -23,15 +23,23 @@ echo "       ServerWatch — Instalação"
 echo "================================================"
 echo ""
 
-for cmd in docker curl openssl; do
+for cmd in curl openssl; do
   if ! command -v $cmd &>/dev/null; then
-    echo -e "${RED}Erro: '$cmd' não encontrado.${NC}"
+    echo -e "${RED}Erro: '$cmd' não encontrado. Instale e tente novamente.${NC}"
     exit 1
   fi
 done
 
+if ! command -v docker &>/dev/null; then
+  echo "Docker não encontrado. Instalando..."
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable docker
+  systemctl start docker
+  echo "Docker instalado."
+fi
+
 if ! docker compose version &>/dev/null; then
-  echo -e "${RED}Erro: 'docker compose' não encontrado. Atualize o Docker.${NC}"
+  echo -e "${RED}Erro: 'docker compose' não encontrado. Atualize o Docker para v2.${NC}"
   exit 1
 fi
 
