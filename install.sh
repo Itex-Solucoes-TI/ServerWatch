@@ -35,11 +35,8 @@ exec < /dev/tty
 echo -e "${YELLOW}Configure a instalação (Enter para usar o valor padrão):${NC}"
 echo ""
 
-read -p "Seu usuário do Docker Hub: " DOCKERHUB_USER
-if [ -z "$DOCKERHUB_USER" ]; then
-  echo -e "${RED}Usuário do Docker Hub é obrigatório.${NC}"
-  exit 1
-fi
+read -p "Seu usuário do Docker Hub [jefvonmuhlen]: " DOCKERHUB_USER
+DOCKERHUB_USER="${DOCKERHUB_USER:-jefvonmuhlen}"
 
 read -p "Nome da empresa [Minha Empresa]: " COMPANY_NAME
 COMPANY_NAME="${COMPANY_NAME:-Minha Empresa}"

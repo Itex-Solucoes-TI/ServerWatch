@@ -15,7 +15,7 @@ services:
       retries: 10
 
   backend:
-    image: ${BACKEND_IMAGE:-itex/serverwatch-backend:latest}
+    image: ${BACKEND_IMAGE:-jefvonmuhlen/serverwatch-backend:latest}
     restart: always
     ports:
       - "8000:8000"
@@ -33,7 +33,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ${FRONTEND_IMAGE:-itex/serverwatch-frontend:latest}
+    image: ${FRONTEND_IMAGE:-jefvonmuhlen/serverwatch-frontend:latest}
     restart: always
     ports:
       - "${PORT:-80}:80"
