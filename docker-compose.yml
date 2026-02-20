@@ -41,8 +41,7 @@ services:
       dockerfile: Dockerfile
     image: ${FRONTEND_IMAGE:-serverwatch-frontend:local}
     restart: always
-    ports:
-      - "8080:8080"
+    network_mode: host
     depends_on:
       - backend
 
