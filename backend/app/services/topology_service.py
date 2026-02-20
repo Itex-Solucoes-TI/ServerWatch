@@ -9,18 +9,40 @@ from app.models.node_position import NodePosition
 from app.models.docker_snapshot import DockerSnapshot
 
 
+def _infer_cidr(ip_address: str) -> str | None:
+    """RFC 1918: infer /24 para IPs privados quando máscara não informada."""
+    try:
+        ip = ipaddress.ip_address(ip_address.strip())
+        if ip.is_private:
+            return "/24"
+    except (ValueError, ipaddress.AddressValueError):
+        pass
+    return None
+
+
 def _parse_subnet(ip_address: str, subnet_mask: str | None) -> str | None:
-    if not subnet_mask or not ip_address:
+    if not ip_address:
         return None
     try:
-        mask = subnet_mask.strip()
-        if mask.startswith("/"):
-            cidr = mask
+        ip_str = ip_address.strip()
+        if not ip_str:
+            return None
+        mask = (subnet_mask or "").strip()
+        if not mask:
+            cidr = _infer_cidr(ip_str)
+            if not cidr:
+                return None
+        elif mask.startswith("/"):
+            cidr = mask if len(mask) > 1 else None
         elif "." in mask:
             cidr = f"/{sum(bin(int(x)).count('1') for x in mask.split('.'))}"
+        elif mask.isdigit():
+            cidr = f"/{int(mask)}"
         else:
-            cidr = f"/{int(mask)}" if mask.isdigit() else f"/{mask}"
-        iface = ipaddress.ip_interface(f"{ip_address}{cidr}")
+            cidr = f"/{mask}"
+        if not cidr:
+            return None
+        iface = ipaddress.ip_interface(f"{ip_str}{cidr}")
         return str(iface.network)
     except (ValueError, ipaddress.AddressValueError):
         return None
@@ -123,12 +145,13 @@ def get_graph(session: Session, company_id: int):
                 seen_edges.add(key)
                 edges.append({"id": f"e-auto-vpn-{nid}", "source": nid, "target": "VPN", "data": {"linkId": None, "linkType": "VPN", "auto": True}})
 
-    private_interfaces = [(i, _parse_subnet(i.ip_address, i.subnet_mask)) for i in all_interfaces if not i.is_external and i.subnet_mask]
-    for i, (iface_a, net_a) in enumerate(private_interfaces):
+    # Ligações LAN: apenas interfaces marcadas como LAN (is_primary) na mesma sub-rede
+    lan_interfaces = [(i, _parse_subnet(i.ip_address, i.subnet_mask)) for i in all_interfaces if not i.is_external and i.is_primary]
+    for i, (iface_a, net_a) in enumerate(lan_interfaces):
         if not net_a:
             continue
         nid_a = _get_node_id(iface_a.server_id, iface_a.router_id)
-        for iface_b, net_b in private_interfaces[i + 1 :]:
+        for iface_b, net_b in lan_interfaces[i + 1 :]:
             if not net_b or net_a != net_b:
                 continue
             nid_b = _get_node_id(iface_b.server_id, iface_b.router_id)

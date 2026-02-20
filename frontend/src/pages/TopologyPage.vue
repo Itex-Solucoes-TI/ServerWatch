@@ -158,8 +158,8 @@ async function onEdgesChange(changes) {
       <p class="font-medium mb-2">Ligações automáticas por interface</p>
       <ol class="list-decimal list-inside space-y-1 text-gray-700">
         <li><strong>IP público</strong> → Liga ao nó "Internet"</li>
-        <li><strong>Rede local</strong> → Mesma faixa de IP (ex.: 192.168.1.x/24) conecta automaticamente</li>
-        <li><strong>VPN</strong> → Liga ao nó "VPN"</li>
+        <li><strong>Rede local (LAN)</strong> → Marque a interface como "Rede local". Liga somente entre dispositivos com LAN na mesma sub-rede (ex.: 192.168.1.10/24 e 192.168.1.20/24)</li>
+        <li><strong>VPN</strong> → Liga ao nó "VPN" (não cria ligação direta entre dispositivos)</li>
         <li>Ligações manuais em "Adicionar ligação" para links adicionais (ex.: WAN entre Docker e Datacenter)</li>
       </ol>
     </div>
