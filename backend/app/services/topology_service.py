@@ -90,19 +90,21 @@ def get_graph(session: Session, company_id: int):
     has_vpn = any(i.is_vpn for i in all_interfaces)
     base_x = 400
     if has_external and "INTERNET" not in node_ids:
+        pos = pos_map.get(("INTERNET", 0), (base_x, 500))
         nodes.append({
             "id": "INTERNET",
             "type": "router",
             "data": {"label": "Internet"},
-            "position": {"x": base_x, "y": 500},
+            "position": {"x": pos[0], "y": pos[1]},
         })
         node_ids.add("INTERNET")
     if has_vpn and "VPN" not in node_ids:
+        pos = pos_map.get(("VPN", 0), (base_x, 20))
         nodes.append({
             "id": "VPN",
             "type": "router",
             "data": {"label": "VPN"},
-            "position": {"x": base_x, "y": 20},
+            "position": {"x": pos[0], "y": pos[1]},
         })
         node_ids.add("VPN")
 

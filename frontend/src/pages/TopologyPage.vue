@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
@@ -36,18 +36,36 @@ async function loadGraph() {
   }
 }
 
-function onNodeDragStop(evt) {
+async function onNodeDragStop(evt) {
   const node = evt?.node || evt?.nodes?.[0]
-  if (!node || node.id === 'INTERNET' || node.id === 'VPN') return
-  const id = parseInt(String(node.id).replace(/^[SR]-/, ''))
-  if (isNaN(id)) return
+  if (!node) return
+
+  await nextTick()
+  const current = nodes.value.find((n) => n.id === node.id)
+  const pos = current?.position ?? node.position ?? { x: 0, y: 0 }
+  let nodeType, nodeId
+  if (node.id === 'INTERNET') {
+    nodeType = 'INTERNET'
+    nodeId = 0
+  } else if (node.id === 'VPN') {
+    nodeType = 'VPN'
+    nodeId = 0
+  } else {
+    const id = parseInt(String(node.id).replace(/^[SR]-/, ''))
+    if (isNaN(id)) return
+    nodeType = node.type === 'server' ? 'SERVER' : 'ROUTER'
+    nodeId = id
+  }
+
   const positions = [{
-    node_type: node.type === 'server' ? 'SERVER' : 'ROUTER',
-    node_id: id,
-    position_x: node.position?.x ?? 0,
-    position_y: node.position?.y ?? 0,
+    node_type: nodeType,
+    node_id: nodeId,
+    position_x: pos.x ?? 0,
+    position_y: pos.y ?? 0,
   }]
-  savePositions(positions).catch(() => {})
+  try {
+    await savePositions(positions)
+  } catch {}
 }
 
 async function onLinkAdded() {
