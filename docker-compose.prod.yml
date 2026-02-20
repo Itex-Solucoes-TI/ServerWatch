@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: always
+    network_mode: host
     environment:
       POSTGRES_DB: serverwatch
       POSTGRES_USER: serverwatch
@@ -17,10 +18,9 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-jefvonmuhlen/serverwatch-backend:latest}
     restart: always
-    ports:
-      - "8000:8000"
+    network_mode: host
     environment:
-      DATABASE_URL: postgresql://serverwatch:${DB_PASSWORD}@postgres/serverwatch
+      DATABASE_URL: postgresql://serverwatch:${DB_PASSWORD}@localhost/serverwatch
       JWT_SECRET: ${JWT_SECRET}
       DEFAULT_COMPANY_NAME: ${DEFAULT_COMPANY_NAME}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL}
