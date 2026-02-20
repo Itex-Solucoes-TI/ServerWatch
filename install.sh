@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-REPO_URL="https://raw.githubusercontent.com/SEU_USUARIO/serverwatch/main"
+REPO_URL="https://raw.githubusercontent.com/Itex-Solucoes-TI/ServerWatch/main"
 INSTALL_DIR="/opt/serverwatch"
 COMPOSE_FILE="$INSTALL_DIR/docker-compose.yml"
 ENV_FILE="$INSTALL_DIR/.env"
