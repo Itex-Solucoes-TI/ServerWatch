@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+cd /
 
 # Se estiver sendo executado via pipe (curl | bash), baixa e re-executa
 if [ -p /dev/stdin ]; then
