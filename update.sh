@@ -22,16 +22,20 @@ fi
 read -p "Versão para atualizar [latest]: " VERSION
 VERSION="${VERSION:-latest}"
 
-# Atualiza a versão no .env
-sed -i "s/^VERSION=.*/VERSION=${VERSION}/" "$INSTALL_DIR/.env"
+# Extrai o usuário Docker Hub atual do .env
+DOCKERHUB_USER=$(grep "^BACKEND_IMAGE=" "$INSTALL_DIR/.env" | cut -d'/' -f1 | cut -d'=' -f2)
+
+# Atualiza as imagens com a nova versão
+sed -i "s|^BACKEND_IMAGE=.*|BACKEND_IMAGE=${DOCKERHUB_USER}/serverwatch-backend:${VERSION}|" "$INSTALL_DIR/.env"
+sed -i "s|^FRONTEND_IMAGE=.*|FRONTEND_IMAGE=${DOCKERHUB_USER}/serverwatch-frontend:${VERSION}|" "$INSTALL_DIR/.env"
 
 cd "$INSTALL_DIR"
 
 echo "Baixando novas imagens..."
-docker compose -f docker-compose.yml pull
+docker compose pull
 
 echo "Reiniciando serviços..."
-docker compose -f docker-compose.yml up -d
+docker compose up -d
 
 echo ""
 echo -e "${GREEN}Atualização concluída! Versão: ${VERSION}${NC}"

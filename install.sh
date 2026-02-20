@@ -76,9 +76,8 @@ curl -fsSL "$REPO_URL/docker-compose.prod.yml" -o "$INSTALL_DIR/docker-compose.y
 
 # Cria o .env com valores já resolvidos (sem variáveis aninhadas)
 cat > "$ENV_FILE" << EOF
-DOCKER_IMAGE_BACKEND=${DOCKERHUB_USER}/serverwatch-backend
-DOCKER_IMAGE_FRONTEND=${DOCKERHUB_USER}/serverwatch-frontend
-VERSION=${VERSION}
+BACKEND_IMAGE=${DOCKERHUB_USER}/serverwatch-backend:${VERSION}
+FRONTEND_IMAGE=${DOCKERHUB_USER}/serverwatch-frontend:${VERSION}
 DB_PASSWORD=${DB_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 DEFAULT_COMPANY_NAME=${COMPANY_NAME}
