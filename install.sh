@@ -3,11 +3,9 @@ set -e
 
 REPO_URL="https://raw.githubusercontent.com/Itex-Solucoes-TI/ServerWatch/main"
 INSTALL_DIR="/opt/serverwatch"
-ENV_FILE="$INSTALL_DIR/.env"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo ""
@@ -28,26 +26,6 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
-DOCKERHUB_USER="${SW_DOCKERHUB_USER:-jefvonmuhlen}"
-VERSION="${SW_VERSION:-latest}"
-COMPANY_NAME="${SW_COMPANY:-Minha Empresa}"
-ADMIN_EMAIL="${SW_ADMIN_EMAIL:-admin@empresa.com}"
-ADMIN_PASSWORD="${SW_ADMIN_PASSWORD:-}"
-PORT="${SW_PORT:-80}"
-
-if [ -z "$ADMIN_PASSWORD" ]; then
-  echo -e "${RED}Erro: SW_ADMIN_PASSWORD não definida.${NC}"
-  echo ""
-  echo "Use:"
-  echo ""
-  echo "  SW_ADMIN_PASSWORD=suasenha \\"
-  echo "  SW_ADMIN_EMAIL=admin@empresa.com \\"
-  echo "  SW_COMPANY=\"Nome da Empresa\" \\"
-  echo "  bash <(curl -fsSL $REPO_URL/install.sh)"
-  echo ""
-  exit 1
-fi
-
 DB_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 48)
 
@@ -56,19 +34,19 @@ mkdir -p "$INSTALL_DIR"
 echo "Baixando arquivos de configuração..."
 curl -fsSL "$REPO_URL/docker-compose.prod.yml" -o "$INSTALL_DIR/docker-compose.yml"
 
-cat > "$ENV_FILE" << EOF
-BACKEND_IMAGE=${DOCKERHUB_USER}/serverwatch-backend:${VERSION}
-FRONTEND_IMAGE=${DOCKERHUB_USER}/serverwatch-frontend:${VERSION}
+cat > "$INSTALL_DIR/.env" << EOF
+BACKEND_IMAGE=jefvonmuhlen/serverwatch-backend:latest
+FRONTEND_IMAGE=jefvonmuhlen/serverwatch-frontend:latest
 DB_PASSWORD=${DB_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
-DEFAULT_COMPANY_NAME=${COMPANY_NAME}
-DEFAULT_ADMIN_EMAIL=${ADMIN_EMAIL}
-DEFAULT_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-PORT=${PORT}
+DEFAULT_COMPANY_NAME=Minha Empresa
+DEFAULT_ADMIN_EMAIL=admin@empresa.com
+DEFAULT_ADMIN_PASSWORD=admin123
+PORT=80
 CORS_ORIGINS=*
 EOF
 
-chmod 600 "$ENV_FILE"
+chmod 600 "$INSTALL_DIR/.env"
 
 echo "Baixando imagens e iniciando ServerWatch..."
 cd "$INSTALL_DIR"
@@ -82,8 +60,9 @@ echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  ServerWatch instalado com sucesso!${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo "  Acesso: http://${SERVER_IP}:${PORT}"
-echo "  Email:  ${ADMIN_EMAIL}"
+echo "  Acesso: http://${SERVER_IP}"
+echo "  Email:  admin@empresa.com"
+echo "  Senha:  admin123"
 echo ""
-echo -e "${YELLOW}  Arquivos em: $INSTALL_DIR${NC}"
+echo "  Troque a senha após o primeiro acesso."
 echo ""
