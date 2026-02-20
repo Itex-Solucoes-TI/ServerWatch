@@ -43,6 +43,10 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
+# Permite containers usarem portas abaixo de 1024
+sysctl -w net.ipv4.ip_unprivileged_port_start=80 &>/dev/null || true
+echo "net.ipv4.ip_unprivileged_port_start=80" >> /etc/sysctl.conf 2>/dev/null || true
+
 DB_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 48)
 
