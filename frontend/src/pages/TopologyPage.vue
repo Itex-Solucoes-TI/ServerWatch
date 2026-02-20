@@ -154,16 +154,6 @@ async function onEdgesChange(changes) {
       </button>
     </div>
 
-    <div class="bg-brand-50 border border-brand-100 rounded-lg p-4 mb-4 text-sm text-brand-800">
-      <p class="font-medium mb-2">Ligações automáticas por interface</p>
-      <ol class="list-decimal list-inside space-y-1 text-gray-700">
-        <li><strong>IP público</strong> → Liga ao nó "Internet"</li>
-        <li><strong>Rede local (LAN)</strong> → Marque a interface como "Rede local". Liga somente entre dispositivos com LAN na mesma sub-rede (ex.: 192.168.1.10/24 e 192.168.1.20/24)</li>
-        <li><strong>VPN</strong> → Liga ao nó "VPN" (não cria ligação direta entre dispositivos)</li>
-        <li>Ligações manuais em "Adicionar ligação" para links adicionais (ex.: WAN entre Docker e Datacenter)</li>
-      </ol>
-    </div>
-
     <div v-if="loading" class="text-gray-500">Carregando...</div>
     <div v-else class="h-[600px] border rounded-lg bg-white relative">
       <VueFlow
@@ -200,6 +190,16 @@ async function onEdgesChange(changes) {
           </button>
         </div>
       </div>
+    </div>
+
+    <div class="mt-4 bg-brand-50 border border-brand-100 rounded-lg p-4 text-sm text-brand-800">
+      <p class="font-medium mb-2">Ligações automáticas por interface</p>
+      <ol class="list-decimal list-inside space-y-1 text-gray-700">
+        <li><strong>IP público</strong> → Liga ao nó "Internet"</li>
+        <li><strong>Rede local (LAN)</strong> → Marque a interface como "Rede local". Liga somente entre dispositivos com LAN na mesma sub-rede (ex.: 192.168.1.10/24 e 192.168.1.20/24)</li>
+        <li><strong>VPN</strong> → Liga ao nó "VPN" (não cria ligação direta entre dispositivos)</li>
+        <li>Ligações manuais em "Adicionar ligação" para links adicionais (ex.: WAN entre Docker e Datacenter)</li>
+      </ol>
     </div>
 
     <AddLinkModal v-if="showAddLink" :nodes="nodes" @done="onLinkAdded" @close="showAddLink = false" />
