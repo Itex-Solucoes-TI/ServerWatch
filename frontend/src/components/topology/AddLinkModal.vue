@@ -10,31 +10,41 @@ const target = ref('')
 const linkType = ref('LAN')
 const loading = ref(false)
 
-const options = computed(() => {
-  const items = props.nodes.map((n) => ({
+const TYPE_LABEL = { server: 'Servidor', router: 'Rede', generic: 'Dispositivo' }
+
+const options = computed(() =>
+  props.nodes.map((n) => ({
     value: n.id,
-    label: `${n.data?.label || n.id} (${n.type === 'server' ? 'Servidor' : 'Roteador'})`,
+    label: `${n.data?.label || n.id} (${TYPE_LABEL[n.type] || n.type})`,
   }))
-  return items
-})
+)
 
 const sourceOptions = computed(() => options.value.filter((o) => o.value !== target.value))
 const targetOptions = computed(() => options.value.filter((o) => o.value !== source.value))
+
+function parseNode(nodeId) {
+  if (nodeId.startsWith('S-')) return { server_id: parseInt(nodeId.replace('S-', '')) }
+  if (nodeId.startsWith('G-')) return { generic_id: parseInt(nodeId.replace('G-', '')) }
+  // R- ou INTERNET/VPN
+  const id = parseInt(nodeId.replace('R-', ''))
+  return isNaN(id) ? {} : { router_id: id }
+}
 
 async function submit() {
   if (!source.value || !target.value) return
   loading.value = true
   try {
-    const [srcType, srcId] = source.value.startsWith('S-') ? ['server', source.value.replace('S-', '')] : ['router', source.value.replace('R-', '')]
-    const [tgtType, tgtId] = target.value.startsWith('S-') ? ['server', target.value.replace('S-', '')] : ['router', target.value.replace('R-', '')]
-    const data = {
+    const src = parseNode(source.value)
+    const tgt = parseNode(target.value)
+    await createLink({
       link_type: linkType.value,
-      source_server_id: srcType === 'server' ? parseInt(srcId) : null,
-      source_router_id: srcType === 'router' ? parseInt(srcId) : null,
-      target_server_id: tgtType === 'server' ? parseInt(tgtId) : null,
-      target_router_id: tgtType === 'router' ? parseInt(tgtId) : null,
-    }
-    await createLink(data)
+      source_server_id: src.server_id ?? null,
+      source_router_id: src.router_id ?? null,
+      source_generic_id: src.generic_id ?? null,
+      target_server_id: tgt.server_id ?? null,
+      target_router_id: tgt.router_id ?? null,
+      target_generic_id: tgt.generic_id ?? null,
+    })
     emit('done')
     emit('close')
     source.value = ''

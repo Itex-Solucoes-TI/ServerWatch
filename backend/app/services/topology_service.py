@@ -7,6 +7,7 @@ from app.models.network_interface import NetworkInterface
 from app.models.network_link import NetworkLink
 from app.models.node_position import NodePosition
 from app.models.docker_snapshot import DockerSnapshot
+from app.models.generic_device import GenericDevice
 
 
 def _infer_cidr(ip_address: str) -> str | None:
@@ -48,13 +49,20 @@ def _parse_subnet(ip_address: str, subnet_mask: str | None) -> str | None:
         return None
 
 
-def _get_node_id(server_id: int | None, router_id: int | None) -> str:
-    return f"S-{server_id}" if server_id else f"R-{router_id}"
+def _get_node_id(server_id=None, router_id=None, generic_id=None) -> str | None:
+    if server_id:
+        return f"S-{server_id}"
+    if router_id:
+        return f"R-{router_id}"
+    if generic_id:
+        return f"G-{generic_id}"
+    return None
 
 
 def get_graph(session: Session, company_id: int):
     servers = session.exec(select(Server).where(Server.company_id == company_id, Server.active == True)).all()
     routers = session.exec(select(Router).where(Router.company_id == company_id, Router.active == True)).all()
+    generics = session.exec(select(GenericDevice).where(GenericDevice.company_id == company_id, GenericDevice.active == True)).all()
     positions = session.exec(select(NodePosition).where(NodePosition.company_id == company_id)).all()
     pos_map = {(p.node_type, p.node_id): (p.position_x, p.position_y) for p in positions}
     links = session.exec(select(NetworkLink).where(NetworkLink.company_id == company_id, NetworkLink.active == True)).all()
@@ -72,28 +80,60 @@ def get_graph(session: Session, company_id: int):
             "type": "server",
             "data": {
                 "label": s.name,
+                "device_type": "SERVER",
                 "server": {"id": s.id, "name": s.name},
-                "interfaces": [{"ip_address": i.ip_address} for i in interfaces],
+                "interfaces": [{"ip_address": iface.ip_address} for iface in interfaces],
                 "containers": containers,
             },
             "position": {"x": pos[0], "y": pos[1]},
         })
+
     for i, r in enumerate(routers):
         interfaces = session.exec(select(NetworkInterface).where(NetworkInterface.router_id == r.id)).all()
         pos = pos_map.get(("ROUTER", r.id), (150 + (i % 3) * 280, 320 + (i // 3) * 200))
         nodes.append({
             "id": f"R-{r.id}",
             "type": "router",
-            "data": {"label": r.name, "router": {"id": r.id, "name": r.name, "has_vpn": r.has_vpn}, "interfaces": [{"ip_address": i.ip_address} for i in interfaces]},
+            "data": {
+                "label": r.name,
+                "device_type": r.device_type,
+                "router": {"id": r.id, "name": r.name, "has_vpn": r.has_vpn},
+                "interfaces": [{"ip_address": iface.ip_address} for iface in interfaces],
+            },
+            "position": {"x": pos[0], "y": pos[1]},
+        })
+
+    for i, g in enumerate(generics):
+        pos = pos_map.get(("GENERIC", g.id), (500 + (i % 3) * 200, 500 + (i // 3) * 150))
+        nodes.append({
+            "id": f"G-{g.id}",
+            "type": "generic",
+            "data": {
+                "label": g.name,
+                "device_type": g.device_type,
+                "generic": {
+                    "id": g.id,
+                    "name": g.name,
+                    "device_type": g.device_type,
+                    "ip_address": g.ip_address,
+                    "rtsp_port": g.rtsp_port,
+                    "rtsp_channel": g.rtsp_channel,
+                    "rtsp_subtype": g.rtsp_subtype,
+                    "has_credentials": bool(g.rtsp_username),
+                },
+            },
             "position": {"x": pos[0], "y": pos[1]},
         })
 
     node_ids = {n["id"] for n in nodes}
     edges = []
     seen_edges = set()
+
     for link in links:
-        src = _get_node_id(link.source_server_id, link.source_router_id)
-        tgt = _get_node_id(link.target_server_id, link.target_router_id)
+        src = _get_node_id(link.source_server_id, link.source_router_id, link.source_generic_id)
+        tgt = _get_node_id(link.target_server_id, link.target_router_id, link.target_generic_id)
+        if not src or not tgt:
+            continue
         key = tuple(sorted([src, tgt]))
         if key not in seen_edges:
             seen_edges.add(key)
@@ -116,7 +156,7 @@ def get_graph(session: Session, company_id: int):
         nodes.append({
             "id": "INTERNET",
             "type": "router",
-            "data": {"label": "Internet"},
+            "data": {"label": "Internet", "device_type": "INTERNET"},
             "position": {"x": pos[0], "y": pos[1]},
         })
         node_ids.add("INTERNET")
@@ -125,7 +165,7 @@ def get_graph(session: Session, company_id: int):
         nodes.append({
             "id": "VPN",
             "type": "router",
-            "data": {"label": "VPN"},
+            "data": {"label": "VPN", "device_type": "VPN"},
             "position": {"x": pos[0], "y": pos[1]},
         })
         node_ids.add("VPN")
@@ -161,5 +201,80 @@ def get_graph(session: Session, company_id: int):
             if key not in seen_edges and nid_a in node_ids and nid_b in node_ids:
                 seen_edges.add(key)
                 edges.append({"id": f"e-auto-lan-{nid_a}-{nid_b}", "source": nid_a, "target": nid_b, "data": {"linkId": None, "linkType": "LAN", "auto": True}})
+
+    # Auto-link câmeras/dispositivos genéricos ao switch/roteador na mesma subnet.
+    # Regras:
+    # - WIFI_AP é ignorado (câmeras ligam via cabo)
+    # - Se houver 1 SWITCH na subnet → liga nele
+    # - Se houver 2+ SWITCHes na mesma subnet → ambíguo, não liga automaticamente
+    # - Se não houver SWITCH → tenta FIREWALL/ROUTER (único na subnet)
+    # - Se houver 2+ ROUTERs na subnet sem SWITCH → ambíguo, não liga
+
+    # Mapa: net -> lista de (nid, device_type)
+    subnet_candidates: dict[str, list[tuple[str, str]]] = {}
+    for iface in all_interfaces:
+        if iface.is_external or iface.is_vpn:
+            continue
+        net = _parse_subnet(iface.ip_address, iface.subnet_mask)
+        if not net:
+            continue
+        nid = _get_node_id(iface.server_id, iface.router_id)
+        if not nid or nid not in node_ids:
+            continue
+        node = next((n for n in nodes if n["id"] == nid), None)
+        if not node:
+            continue
+        dtype = node["data"].get("device_type", "OTHER")
+        if dtype == "WIFI_AP":
+            continue
+        if net not in subnet_candidates:
+            subnet_candidates[net] = []
+        # Evitar duplicar o mesmo nó (router com múltiplas interfaces na mesma subnet)
+        if not any(n == nid for n, _ in subnet_candidates[net]):
+            subnet_candidates[net].append((nid, dtype))
+
+    def _resolve_parent(candidates: list[tuple[str, str]]) -> str | None:
+        """Retorna o nó pai único ou None se ambíguo."""
+        switches = [nid for nid, dt in candidates if dt == "SWITCH"]
+        if len(switches) == 1:
+            return switches[0]
+        if len(switches) > 1:
+            return None  # ambíguo: 2+ switches, precisa ligação manual
+        # Sem switch: tenta FIREWALL ou ROUTER único
+        wired = [nid for nid, dt in candidates if dt in ("FIREWALL", "ROUTER")]
+        if len(wired) == 1:
+            return wired[0]
+        return None  # ambíguo ou vazio
+
+    for g in generics:
+        if not g.ip_address:
+            continue
+        g_nid = f"G-{g.id}"
+        if g_nid not in node_ids:
+            continue
+        for prefix in (24, 16):
+            try:
+                net = str(ipaddress.ip_interface(f"{g.ip_address.strip()}/{prefix}").network)
+            except ValueError:
+                continue
+            candidates = subnet_candidates.get(net, [])
+            parent_nid = _resolve_parent(candidates)
+            if parent_nid:
+                key = tuple(sorted([g_nid, parent_nid]))
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    edges.append({
+                        "id": f"e-auto-cam-{g_nid}",
+                        "source": parent_nid,
+                        "target": g_nid,
+                        "data": {"linkId": None, "linkType": "LAN", "auto": True},
+                    })
+                break
+            elif candidates:
+                # Ambíguo: marca o nó para sinalizar no frontend
+                node = next((n for n in nodes if n["id"] == g_nid), None)
+                if node:
+                    node["data"]["link_ambiguous"] = True
+                break
 
     return {"nodes": nodes, "edges": edges}

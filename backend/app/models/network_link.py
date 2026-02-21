@@ -11,6 +11,8 @@ class NetworkLink(SQLModel, table=True):
     source_router_id: Optional[int] = Field(default=None, foreign_key="routers.id")
     target_server_id: Optional[int] = Field(default=None, foreign_key="servers.id")
     target_router_id: Optional[int] = Field(default=None, foreign_key="routers.id")
+    source_generic_id: Optional[int] = Field(default=None, foreign_key="generic_devices.id")
+    target_generic_id: Optional[int] = Field(default=None, foreign_key="generic_devices.id")
     link_type: str = Field(max_length=50)
     bandwidth_mbps: Optional[int] = None
     active: bool = Field(default=True)

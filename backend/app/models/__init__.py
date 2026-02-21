@@ -12,3 +12,5 @@ from app.models.notification import NotificationChannel, AlertRule
 from app.models.audit_log import AuditLog
 from app.models.snmp_metric import SnmpMetric
 from app.models.snmp_monitor import SnmpMonitor
+from app.models.generic_device import GenericDevice
+from app.models.wifi_network import WifiNetwork
