@@ -97,6 +97,9 @@ def get_dashboard(
     for s in servers:
         env_counts[s.environment] = env_counts.get(s.environment, 0) + 1
 
+    # Resumo SNMP dos roteadores com monitoramento ativo
+    snmp_summary = _snmp_summary(routers, session)
+
     return {
         "servers_count": len(servers),
         "routers_count": len(routers),
@@ -111,4 +114,55 @@ def get_dashboard(
         "check_types": check_types,
         "servers_by_env": env_counts,
         "routers_with_vpn": sum(1 for r in routers if r.has_vpn),
+        "snmp_summary": snmp_summary,
+    }
+
+
+def _snmp_summary(routers, session: Session) -> dict:
+    """Agrega métricas SNMP recentes para o dashboard."""
+    from app.models.snmp_metric import SnmpMetric
+    from datetime import timedelta
+    monitored_ids = [r.id for r in routers if r.snmp_enabled]
+    if not monitored_ids:
+        return {"monitored_count": 0, "routers": []}
+
+    # Última leitura de cada (router, type, interface) — sem limite de tempo
+    metrics = session.exec(
+        select(SnmpMetric).where(
+            SnmpMetric.router_id.in_(monitored_ids),
+            SnmpMetric.metric_type.in_(["CPU", "MEMORY", "WIFI_CLIENTS", "TRAFFIC_IN", "TRAFFIC_OUT"]),
+        ).order_by(SnmpMetric.collected_at.desc())
+    ).all()
+
+    seen: dict[tuple, SnmpMetric] = {}
+    for m in metrics:
+        key = (m.router_id, m.metric_type, m.interface_name)
+        if key not in seen:
+            seen[key] = m
+
+    router_map = {r.id: r.name for r in routers if r.snmp_enabled}
+    summary: dict[int, dict] = {rid: {"router_id": rid, "name": router_map[rid]} for rid in monitored_ids}
+
+    total_clients = 0
+    for (rid, mtype, iface), m in seen.items():
+        if mtype == "CPU":
+            summary[rid]["cpu"] = m.value
+        elif mtype == "MEMORY":
+            summary[rid]["memory"] = m.value
+        elif mtype == "WIFI_CLIENTS":
+            summary[rid]["wifi_clients"] = int(m.value)
+            total_clients += int(m.value)
+        elif mtype == "TRAFFIC_IN":
+            summary[rid].setdefault("traffic_in", 0)
+            summary[rid]["traffic_in"] += m.value
+        elif mtype == "TRAFFIC_OUT":
+            summary[rid].setdefault("traffic_out", 0)
+            summary[rid]["traffic_out"] += m.value
+
+    # Inclui todos os roteadores com SNMP habilitado, mesmo sem métricas ainda
+    router_list = list(summary.values())
+    return {
+        "monitored_count": len(monitored_ids),
+        "total_wifi_clients": total_clients,
+        "routers": router_list,
     }

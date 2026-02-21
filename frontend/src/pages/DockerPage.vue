@@ -124,11 +124,11 @@ async function remove(c) {
 <template>
   <div>
     <h2 class="text-xl font-bold text-brand-800 mb-6">Docker</h2>
-    <div class="flex gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
       <select
         v-model="selectedServerId"
         @change="selectedServerId && loadContainers(selectedServerId)"
-        class="border rounded px-4 py-2"
+        class="border rounded px-4 py-2 w-full sm:w-auto min-w-0"
       >
         <option v-for="s in servers.filter((x) => x.has_docker)" :key="s.id" :value="s.id">
           {{ s.name }}
@@ -148,7 +148,7 @@ async function remove(c) {
       {{ syncError }}
     </div>
     <p class="mb-2 text-sm text-gray-600">Sincronização automática a cada 30s.</p>
-    <details open class="mb-6 p-4 bg-brand-50 rounded-lg border border-brand-200">
+    <details class="mb-6 p-4 bg-brand-50 rounded-lg border border-brand-200">
       <summary class="cursor-pointer font-medium text-brand-800">Como configurar Docker remoto</summary>
       <div class="mt-3 text-sm text-gray-700 space-y-2">
         <p>No servidor remoto que deseja monitorar:</p>

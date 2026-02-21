@@ -7,7 +7,7 @@ from app.scheduler import start_scheduler
 from app.config import settings
 from app.routers import auth, companies, users, servers, routers_api, license
 from app.routers import network, topology, checks, notifications, company_settings
-from app.routers import docker_api, health, dashboard, ws
+from app.routers import docker_api, health, dashboard, ws, backup
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.include_router(topology.router, prefix="/api")
 app.include_router(checks.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(company_settings.router, prefix="/api")
+app.include_router(backup.router, prefix="/api")
 app.include_router(docker_api.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(ws.router, prefix="/api")

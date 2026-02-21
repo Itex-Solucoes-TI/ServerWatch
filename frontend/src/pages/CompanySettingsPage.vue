@@ -2,6 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { get, update } from '../api/settings'
 import { status as licenseStatus, activate as licenseActivate, remove as licenseRemove } from '../api/license'
+import { exportBackup, importBackup } from '../api/backup'
+import { encryptBackup, decryptBackup, isEncryptedBackup } from '../utils/backupCrypto'
 import { useAuthStore } from '../stores/auth'
 import { toast } from 'vue-sonner'
 
@@ -11,6 +13,11 @@ const license = ref({ needs_license: true, valid_until: null })
 const licenseToken = ref('')
 const licenseLoading = ref(false)
 const auth = useAuthStore()
+const backupLoading = ref(false)
+const backupReplace = ref(false)
+const backupEncrypt = ref(true)
+const backupPassword = ref('')
+const backupImportPassword = ref('')
 
 onMounted(async () => {
   try {
@@ -60,6 +67,65 @@ function formatDate(iso) {
 function formatCnpj(d) {
   if (!d || d.length !== 14) return d || ''
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+}
+
+async function doExportBackup() {
+  if (backupEncrypt.value && !backupPassword.value.trim()) {
+    toast.error('Informe a senha para criptografar')
+    return
+  }
+  backupLoading.value = true
+  try {
+    const { data } = await exportBackup()
+    let content, filename, mime
+    if (backupEncrypt.value && backupPassword.value.trim()) {
+      content = await encryptBackup(data, backupPassword.value)
+      filename = `serverwatch-backup-${data.company?.slug || 'empresa'}-${new Date().toISOString().slice(0, 10)}.enc.json`
+      mime = 'application/json'
+    } else {
+      content = JSON.stringify(data, null, 2)
+      filename = `serverwatch-backup-${data.company?.slug || 'empresa'}-${new Date().toISOString().slice(0, 10)}.json`
+      mime = 'application/json'
+    }
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Backup exportado')
+  } catch (e) {
+    toast.error(e.response?.data?.detail ?? 'Erro ao exportar')
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+async function onBackupFileChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  backupLoading.value = true
+  try {
+    const text = await file.text()
+    let data
+    if (isEncryptedBackup(text)) {
+      if (!backupImportPassword.value.trim()) {
+        toast.error('Arquivo criptografado - informe a senha')
+        return
+      }
+      data = await decryptBackup(text, backupImportPassword.value)
+    } else {
+      data = JSON.parse(text)
+    }
+    await importBackup(data, backupReplace.value)
+    toast.success('Backup importado')
+  } catch (e) {
+    toast.error(e.response?.data?.detail ?? (e instanceof SyntaxError ? 'Arquivo JSON inválido' : e.message || 'Erro ao importar'))
+  } finally {
+    backupLoading.value = false
+    e.target.value = ''
+  }
 }
 
 async function removeLicense() {
@@ -171,6 +237,62 @@ async function removeLicense() {
           <div>
             <label class="block text-sm text-gray-600 mb-1">Client Token (opcional)</label>
             <input v-model="s.zapi_client_token" class="w-full border rounded px-3 py-2" />
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="font-medium mb-4">Backup</h3>
+        <p class="text-sm text-gray-600 mb-4">
+          Exporte ou importe configurações, servidores, roteadores, health checks, notificações e usuários da empresa.
+          Use criptografia para proteger senhas e credenciais.
+        </p>
+        <div class="space-y-4">
+          <div class="flex flex-wrap gap-4 items-end">
+            <div>
+              <label class="flex items-center gap-2 text-sm mb-2">
+                <input v-model="backupEncrypt" type="checkbox" />
+                Criptografar backup
+              </label>
+              <input
+                v-if="backupEncrypt"
+                v-model="backupPassword"
+                type="password"
+                placeholder="Senha para criptografia"
+                class="w-48 border rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              @click="doExportBackup"
+              :disabled="backupLoading"
+              class="px-4 py-2 bg-brand-500 text-white rounded-lg disabled:opacity-50"
+            >
+              Exportar backup
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-4 items-end">
+            <div>
+              <input
+                v-model="backupImportPassword"
+                type="password"
+                placeholder="Senha (se criptografado)"
+                class="w-48 border rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <input
+              type="file"
+              accept=".json,.enc.json,application/json"
+              @change="onBackupFileChange"
+              class="hidden"
+              id="backup-file"
+            />
+            <label for="backup-file" class="px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+              Importar backup
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input v-model="backupReplace" type="checkbox" />
+              Substituir dados existentes
+            </label>
           </div>
         </div>
       </div>

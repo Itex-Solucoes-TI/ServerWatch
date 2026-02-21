@@ -29,12 +29,14 @@ def execute_check(check: HealthCheck, session: Session):
                   "TELNET": telnet_checker.check, "PING": ping_checker.check}.get(check.check_type)
             result = fn(check) if fn else None
     else:
+        from app.services.checker import snmp_checker
         checker_map = {
             "URL": url_checker.check,
             "PORT": port_checker.check,
             "DATABASE": db_checker.check,
             "TELNET": telnet_checker.check,
             "PING": ping_checker.check,
+            "SNMP": snmp_checker.check,
         }
         fn = checker_map.get(check.check_type)
         result = fn(check) if fn else None

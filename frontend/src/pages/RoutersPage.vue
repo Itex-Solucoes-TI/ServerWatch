@@ -1,10 +1,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { list, create, update, remove, listInterfaces, addInterface, updateInterface, removeInterface } from '../api/routers'
+import { useRouter } from 'vue-router'
+import { list, create, update, remove, cloneRouter } from '../api/routers'
 import { toast } from 'vue-sonner'
-import { Plus, Radio, Trash2, Pencil } from 'lucide-vue-next'
+import { Plus, Radio, Wifi, Network, Shield, HelpCircle, Trash2, Pencil, BarChart2, Copy } from 'lucide-vue-next'
 import BaseModal from '../components/ui/BaseModal.vue'
 import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
 
 const auth = useAuthStore()
 
@@ -12,13 +15,20 @@ const items = ref([])
 const loading = ref(true)
 const showModal = ref(false)
 const editId = ref(null)
-const interfaces = ref([])
 const form = ref(defaultForm())
-const editInt = ref(null)
 const intForm = ref(defaultIntForm())
 
 function defaultForm() {
-  return { name: '', model: '', location: '', has_vpn: false, has_external_ip: false }
+  return {
+    name: '',
+    brand: '',
+    model: '',
+    location: '',
+    device_type: 'ROUTER',
+    has_vpn: false,
+    has_external_ip: false,
+    create_ping_check: false
+  }
 }
 function defaultIntForm() {
   return { ip_address: '', interface_name: '', subnet_mask: '', is_external: false, is_vpn: false, is_primary: false }
@@ -37,11 +47,12 @@ async function load() {
   }
 }
 
-async function openNew() {
+const createInterfaces = ref([])
+
+function openNew() {
   editId.value = null
   form.value = defaultForm()
-  interfaces.value = []
-  editInt.value = null
+  createInterfaces.value = []
   intForm.value = defaultIntForm()
   showModal.value = true
 }
@@ -49,15 +60,7 @@ async function openNew() {
 async function openEdit(r) {
   editId.value = r.id
   form.value = { ...r }
-  editInt.value = null
-  intForm.value = defaultIntForm()
   showModal.value = true
-  try {
-    const { data } = await listInterfaces(r.id)
-    interfaces.value = data
-  } catch {
-    interfaces.value = []
-  }
 }
 
 function closeModal() {
@@ -68,19 +71,37 @@ function closeModal() {
 async function save() {
   try {
     if (editId.value) {
-      await update(editId.value, form.value)
-      toast.success('Roteador salvo')
+      await update(editId.value, {
+        name: form.value.name, brand: form.value.brand, model: form.value.model,
+        location: form.value.location, device_type: form.value.device_type,
+        has_vpn: form.value.has_vpn, has_external_ip: form.value.has_external_ip,
+      })
+      toast.success('Salvo')
+      closeModal()
       await load()
     } else {
-      const { data } = await create(form.value)
-      editId.value = data.id
-      items.value.push(data)
+      const payload = { ...form.value, interfaces: createInterfaces.value }
+      const { data } = await create(payload)
       toast.success('Roteador criado')
+      closeModal()
+      // Navega para a página de detalhe para completar as configurações
+      router.push(`/routers/${data.id}`)
     }
   } catch (e) {
     toast.error(e.response?.data?.detail ?? 'Erro')
   }
 }
+
+function addCreateInterface() {
+  if (!intForm.value.ip_address.trim()) return
+  createInterfaces.value.push({ ...intForm.value })
+  intForm.value = defaultIntForm()
+}
+
+function removeCreateInterface(idx) {
+  createInterfaces.value.splice(idx, 1)
+}
+
 
 async function doRemove(id) {
   if (!confirm('Excluir este roteador?')) return
@@ -93,44 +114,28 @@ async function doRemove(id) {
   }
 }
 
-function openEditInt(i) {
-  editInt.value = i
-  intForm.value = { ip_address: i.ip_address, interface_name: i.interface_name || '', subnet_mask: i.subnet_mask || '', is_external: i.is_external || false, is_vpn: i.is_vpn || false, is_primary: i.is_primary || false }
+const DEVICE_ICONS = {
+  ROUTER: Radio,
+  WIFI_AP: Wifi,
+  SWITCH: Network,
+  FIREWALL: Shield,
+  OTHER: HelpCircle,
+}
+function deviceIcon(type) {
+  return DEVICE_ICONS[type] || Radio
 }
 
-function cancelInt() {
-  editInt.value = null
-  intForm.value = defaultIntForm()
-}
-
-async function saveInt() {
-  if (!intForm.value.ip_address.trim() || !editId.value) return
+async function doClone(id) {
   try {
-    if (editInt.value) {
-      const { data } = await updateInterface(editId.value, editInt.value.id, intForm.value)
-      const idx = interfaces.value.findIndex((x) => x.id === editInt.value.id)
-      if (idx >= 0) interfaces.value[idx] = data
-      toast.success('Interface atualizada')
-    } else {
-      const { data } = await addInterface(editId.value, intForm.value)
-      interfaces.value.push(data)
-      toast.success('Interface adicionada')
-    }
-    cancelInt()
+    const { data } = await cloneRouter(id)
+    toast.success(`Clonado como "${data.name}"`)
+    // Navega direto para o clone para ajustar o nome
+    router.push(`/routers/${data.new_router_id}`)
   } catch (e) {
-    toast.error(e.response?.data?.detail ?? 'Erro')
+    toast.error(e.response?.data?.detail ?? 'Erro ao clonar')
   }
 }
 
-async function delInt(id) {
-  try {
-    await removeInterface(editId.value, id)
-    interfaces.value = interfaces.value.filter((i) => i.id !== id)
-    toast.success('Interface removida')
-  } catch (e) {
-    toast.error(e.response?.data?.detail ?? 'Erro')
-  }
-}
 </script>
 
 <template>
@@ -144,70 +149,83 @@ async function delInt(id) {
 
     <div v-if="loading" class="text-gray-500">Carregando...</div>
     <div v-else class="grid gap-4">
-      <div v-for="r in items" :key="r.id" class="bg-white rounded-lg shadow-sm border p-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Radio class="w-8 h-8 text-brand-500 shrink-0" />
-          <div>
-            <p class="font-medium text-brand-800">{{ r.name }}</p>
-            <p class="text-sm text-gray-500">{{ r.model || '—' }} {{ r.has_vpn ? '• VPN' : '' }}</p>
+      <div v-for="r in items" :key="r.id" class="bg-white rounded-lg shadow-sm border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex items-center gap-4 min-w-0">
+          <component :is="deviceIcon(r.device_type)" class="w-6 h-6 sm:w-8 sm:h-8 text-brand-500 shrink-0" />
+          <div class="min-w-0">
+            <p class="font-medium text-brand-800 truncate cursor-pointer hover:text-brand-600" @click="router.push(`/routers/${r.id}`)">{{ r.name }}</p>
+            <p class="text-sm text-gray-500 truncate">
+              <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">{{ { ROUTER:'Roteador', WIFI_AP:'WiFi AP', SWITCH:'Switch', FIREWALL:'Firewall', OTHER:'Outro' }[r.device_type] || r.device_type }}</span>
+              {{ [r.brand, r.model].filter(Boolean).join(' ') || '' }}
+              <span v-if="r.has_vpn"> • VPN</span>
+              <span v-if="r.snmp_enabled" class="ml-1 text-xs bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full">SNMP</span>
+            </p>
           </div>
         </div>
-        <div v-if="auth.isOperator" class="flex gap-1">
-          <button @click="openEdit(r)" class="p-2 text-brand-500 hover:bg-brand-50 rounded" title="Editar"><Pencil class="w-4 h-4" /></button>
+        <div class="flex gap-1 shrink-0 justify-end sm:justify-start">
+          <button @click="router.push(`/routers/${r.id}`)" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded" title="Monitoramento / Detalhe"><BarChart2 class="w-4 h-4" /></button>
+          <button v-if="auth.isOperator" @click="openEdit(r)" class="p-2 text-brand-500 hover:bg-brand-50 rounded" title="Editar dados"><Pencil class="w-4 h-4" /></button>
+          <button v-if="auth.isOperator" @click="doClone(r.id)" class="p-2 text-indigo-500 hover:bg-indigo-50 rounded" title="Clonar (copia dados, interfaces e monitores SNMP)"><Copy class="w-4 h-4" /></button>
           <button v-if="auth.isAdmin" @click="doRemove(r.id)" class="p-2 text-red-500 hover:bg-red-50 rounded" title="Excluir"><Trash2 class="w-4 h-4" /></button>
         </div>
       </div>
       <p v-if="!items.length" class="text-gray-500 py-8 text-center">Nenhum roteador cadastrado.</p>
     </div>
 
-    <BaseModal v-if="showModal" :title="editId ? 'Editar Roteador' : 'Novo Roteador'" size="lg" @close="closeModal">
+    <BaseModal v-if="showModal" :title="editId ? 'Editar Identificação' : 'Novo Aparelho'" size="md" @close="closeModal">
       <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+        <!-- Identificação -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-sm text-gray-600 mb-1">Nome <span class="text-red-500">*</span></label>
+            <input v-model="form.name" class="w-full border rounded px-3 py-2 text-sm" placeholder="ex: Roteador Central, AP Sala" />
+          </div>
           <div>
-            <label class="block text-sm text-gray-600 mb-1">Nome</label>
-            <input v-model="form.name" class="w-full border rounded px-3 py-2" />
+            <label class="block text-sm text-gray-600 mb-1">Tipo de Aparelho</label>
+            <select v-model="form.device_type" class="w-full border rounded px-3 py-2 text-sm">
+              <option value="ROUTER">Roteador</option>
+              <option value="WIFI_AP">Access Point / WiFi</option>
+              <option value="SWITCH">Switch</option>
+              <option value="FIREWALL">Firewall</option>
+              <option value="OTHER">Outro</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Localização</label>
+            <input v-model="form.location" class="w-full border rounded px-3 py-2 text-sm" placeholder="Sala de TI, Rack 2..." />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Marca</label>
+            <input v-model="form.brand" class="w-full border rounded px-3 py-2 text-sm" placeholder="MikroTik, Ubiquiti..." />
           </div>
           <div>
             <label class="block text-sm text-gray-600 mb-1">Modelo</label>
-            <input v-model="form.model" class="w-full border rounded px-3 py-2" placeholder="ex: MikroTik RB3011" />
+            <input v-model="form.model" class="w-full border rounded px-3 py-2 text-sm" placeholder="RB3011, UAP-AC-PRO..." />
           </div>
         </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">Localização</label>
-          <input v-model="form.location" class="w-full border rounded px-3 py-2" placeholder="ex: Sala de TI" />
-        </div>
-        <div class="flex gap-6">
-          <label class="flex items-center gap-2 cursor-pointer text-sm">
-            <input v-model="form.has_vpn" type="checkbox" /> Possui VPN
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer text-sm">
-            <input v-model="form.has_external_ip" type="checkbox" /> IP externo
-          </label>
+        <div class="flex gap-5 text-sm">
+          <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.has_vpn" type="checkbox" /> Possui VPN</label>
+          <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.has_external_ip" type="checkbox" /> IP externo</label>
         </div>
 
-        <button @click="save" class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm">
-          {{ editId ? 'Salvar alterações' : 'Criar roteador' }}
-        </button>
-
-        <div v-if="editId" class="border-t pt-4 mt-2">
-          <p class="text-sm text-gray-500 mb-3">Ex: IP público (WAN), IP privado 192.168.0.1/24 (LAN), interfaces VPN</p>
-          <h4 class="font-medium text-sm mb-3">Interfaces de rede</h4>
-          <div class="bg-gray-50 rounded-lg p-3 space-y-2 mb-3">
+        <!-- Interfaces — só na criação -->
+        <div v-if="!editId" class="border-t pt-4">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">IPs / Interfaces</p>
+          <div class="bg-gray-50 rounded-lg p-3 space-y-2 mb-2">
             <div class="flex gap-2 flex-wrap">
-              <input v-model="intForm.ip_address" placeholder="IP (200.x.x.x ou 192.168.0.1)" class="border rounded px-2 py-1.5 text-sm flex-1 min-w-[140px]" />
-              <input v-model="intForm.interface_name" placeholder="WAN1, LAN, tun0..." class="border rounded px-2 py-1.5 text-sm w-24" />
-              <input v-model="intForm.subnet_mask" placeholder="/24" class="border rounded px-2 py-1.5 text-sm w-16" />
+              <input v-model="intForm.ip_address" placeholder="192.168.0.1" class="border rounded px-2 py-1.5 text-sm flex-1 min-w-[130px]" />
+              <input v-model="intForm.interface_name" placeholder="WAN, LAN..." class="border rounded px-2 py-1.5 text-sm w-20" />
+              <input v-model="intForm.subnet_mask" placeholder="/24" class="border rounded px-2 py-1.5 text-sm w-14" />
             </div>
             <div class="flex gap-4 items-center flex-wrap text-sm">
-              <label class="flex items-center gap-1 cursor-pointer"><input v-model="intForm.is_external" type="checkbox" /> IP público</label>
+              <label class="flex items-center gap-1 cursor-pointer"><input v-model="intForm.is_external" type="checkbox" /> Público</label>
               <label class="flex items-center gap-1 cursor-pointer"><input v-model="intForm.is_primary" type="checkbox" /> LAN</label>
               <label class="flex items-center gap-1 cursor-pointer"><input v-model="intForm.is_vpn" type="checkbox" /> VPN</label>
-              <button @click="saveInt" class="px-3 py-1 bg-brand-500 text-white rounded text-sm">{{ editInt ? 'Salvar' : 'Adicionar' }}</button>
-              <button v-if="editInt" @click="cancelInt" class="px-3 py-1 border rounded text-sm">Cancelar</button>
+              <button @click="addCreateInterface" class="px-3 py-1 bg-brand-500 text-white rounded text-sm">Adicionar</button>
             </div>
           </div>
-          <ul class="divide-y text-sm">
-            <li v-for="i in interfaces" :key="i.id" class="flex justify-between items-center py-1.5">
+          <ul class="divide-y text-sm mb-2">
+            <li v-for="(i, idx) in createInterfaces" :key="idx" class="flex justify-between items-center py-1.5">
               <span>
                 <span class="font-mono">{{ i.ip_address }}</span>
                 <span v-if="i.subnet_mask" class="text-gray-400">{{ i.subnet_mask }}</span>
@@ -216,12 +234,22 @@ async function delInt(id) {
                 <span v-if="i.is_primary" class="text-emerald-600 text-xs ml-1">LAN</span>
                 <span v-if="i.is_vpn" class="text-brand-600 text-xs ml-1">VPN</span>
               </span>
-              <div class="flex gap-2">
-                <button @click="openEditInt(i)" class="text-brand-500 hover:underline text-xs">Editar</button>
-                <button @click="delInt(i.id)" class="text-red-500 hover:underline text-xs">Remover</button>
-              </div>
+              <button @click="removeCreateInterface(idx)" class="text-red-500 hover:underline text-xs">Remover</button>
             </li>
           </ul>
+          <label v-if="createInterfaces.length" class="flex items-center gap-2 cursor-pointer text-sm">
+            <input v-model="form.create_ping_check" type="checkbox" /> Criar health check por ping automaticamente
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t gap-3">
+          <p v-if="editId" class="text-xs text-gray-400">Rede, WiFi e SNMP: configure na página de detalhe</p>
+          <div class="flex gap-2 ml-auto">
+            <button @click="closeModal" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+            <button @click="save" class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm">
+              {{ editId ? 'Salvar' : 'Criar e configurar →' }}
+            </button>
+          </div>
         </div>
       </div>
     </BaseModal>

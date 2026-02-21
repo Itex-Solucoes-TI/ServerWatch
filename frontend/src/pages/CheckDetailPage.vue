@@ -5,6 +5,7 @@ import { get, create, update, getResults } from '../api/checks'
 import { list as listServers } from '../api/servers'
 import { list as listRouters } from '../api/routers'
 import { toast } from 'vue-sonner'
+import { fmtDateTime } from '../utils/date'
 
 const route = useRoute()
 const router = useRouter()
@@ -123,7 +124,7 @@ async function save() {
           </thead>
           <tbody>
             <tr v-for="r in results" :key="r.id" class="border-t">
-              <td class="py-1">{{ new Date(r.checked_at).toLocaleString() }}</td>
+              <td class="py-1">{{ fmtDateTime(r.checked_at) }}</td>
               <td :class="r.status === 'OK' ? 'text-emerald-600' : 'text-red-600'">{{ r.status }}</td>
               <td>{{ r.latency_ms != null ? r.latency_ms + 'ms' : '–' }}</td>
               <td>{{ r.message || '–' }}</td>

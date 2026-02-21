@@ -138,24 +138,24 @@ async function onEdgesChange(changes) {
 
 <template>
   <div>
-    <div class="flex justify-between items-start mb-4">
-      <div>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+      <div class="min-w-0">
         <h2 class="text-xl font-bold text-brand-800">Topologia de Rede</h2>
-        <p class="text-sm text-gray-500 mt-1">
+        <p class="text-sm text-gray-500 mt-1 hidden sm:block">
           Cadastre servidores e roteadores em suas páginas, depois adicione as ligações aqui.
         </p>
       </div>
       <button
         v-if="auth.isOperator && nodes.length >= 2"
         @click="showAddLink = true"
-        class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg"
+        class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg shrink-0 w-fit"
       >
         + Adicionar ligação
       </button>
     </div>
 
     <div v-if="loading" class="text-gray-500">Carregando...</div>
-    <div v-else class="h-[600px] border rounded-lg bg-white relative">
+    <div v-else class="h-[min(70vh,500px)] sm:h-[600px] border rounded-lg bg-white relative">
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"

@@ -1,21 +1,32 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { get as getDashboard } from '../api/dashboard'
 import { toast } from 'vue-sonner'
+import { fmtDateTime } from '../utils/date'
 
 const data = ref(null)
 const loading = ref(true)
+const lastUpdated = ref(null)
+let interval = null
 
-onMounted(async () => {
+async function fetchData() {
   try {
     const { data: d } = await getDashboard()
     data.value = d
+    lastUpdated.value = new Date()
   } catch {
     toast.error('Erro ao carregar dashboard')
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  fetchData()
+  interval = setInterval(fetchData, 30_000)
 })
+
+onUnmounted(() => clearInterval(interval))
 
 const uptimeColor = computed(() => {
   const v = data.value?.uptime_24h_pct
@@ -38,15 +49,23 @@ const latencyColor = (ms) => {
   return 'text-red-600'
 }
 
-const formatDate = (iso) => {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+const formatDate = fmtDateTime
+
+
+const fmtBytesShort = (bps) => {
+  if (bps == null) return '—'
+  if (bps >= 1_000_000) return (bps / 1_000_000).toFixed(1) + 'MB/s'
+  if (bps >= 1000) return (bps / 1000).toFixed(1) + 'KB/s'
+  return Math.round(bps) + 'B/s'
 }
 </script>
 
 <template>
   <div>
-    <h2 class="text-xl font-bold text-brand-800 mb-6">Dashboard</h2>
+    <div class="mb-6">
+      <h2 class="text-xl font-bold text-brand-800">Dashboard</h2>
+      <p v-if="lastUpdated" class="text-xs text-gray-400 mt-0.5">Atualizado em {{ lastUpdated.toLocaleString('pt-BR') }}</p>
+    </div>
 
     <div v-if="loading" class="text-gray-400 text-sm">Carregando...</div>
 
@@ -153,6 +172,39 @@ const formatDate = (iso) => {
               </span>
             </li>
           </ul>
+        </div>
+      </div>
+
+      <!-- SNMP Summary -->
+      <div v-if="data?.snmp_summary?.monitored_count" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-medium text-gray-700">Roteadores Monitorados (SNMP)</h3>
+          <span class="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full">{{ data.snmp_summary.monitored_count }} monitorados</span>
+        </div>
+        <div v-if="data.snmp_summary.total_wifi_clients != null" class="mb-3 flex gap-4 text-sm">
+          <span class="text-gray-600">Clientes WiFi totais: <strong class="text-brand-800">{{ data.snmp_summary.total_wifi_clients }}</strong></span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div v-for="r in data.snmp_summary.routers" :key="r.router_id" class="border rounded-lg p-3 text-sm space-y-2">
+            <p class="font-medium text-gray-800 truncate">{{ r.name }}</p>
+            <!-- CPU / Memória / WiFi -->
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+              <span v-if="r.cpu != null">
+                CPU <strong :class="r.cpu >= 90 ? 'text-red-600' : r.cpu >= 75 ? 'text-amber-600' : 'text-emerald-600'">{{ r.cpu }}%</strong>
+              </span>
+              <span v-if="r.memory != null">
+                Mem <strong :class="r.memory >= 90 ? 'text-red-600' : r.memory >= 75 ? 'text-amber-600' : 'text-emerald-600'">{{ r.memory }}%</strong>
+              </span>
+              <span v-if="r.wifi_clients != null">
+                WiFi <strong class="text-brand-700">{{ r.wifi_clients }}</strong>
+              </span>
+            </div>
+            <!-- Tráfego -->
+            <div v-if="r.traffic_in != null || r.traffic_out != null" class="flex gap-4 text-xs text-gray-600 border-t pt-2">
+              <span v-if="r.traffic_in != null">↓ <strong class="text-emerald-600">{{ fmtBytesShort(r.traffic_in) }}</strong></span>
+              <span v-if="r.traffic_out != null">↑ <strong class="text-orange-500">{{ fmtBytesShort(r.traffic_out) }}</strong></span>
+            </div>
+          </div>
         </div>
       </div>
 

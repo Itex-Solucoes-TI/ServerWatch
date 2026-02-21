@@ -27,12 +27,12 @@ const sizeClass = {
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
       @click.self="emit('close')"
     >
       <div
-        class="bg-white rounded-xl shadow-xl w-full flex flex-col max-h-[90vh]"
-        :class="sizeClass[size] ?? sizeClass.md"
+        class="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full flex flex-col max-h-[90vh] sm:max-h-[85vh]"
+        :class="[sizeClass[size] ?? sizeClass.md, 'mx-0 sm:mx-auto']"
       >
         <div class="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <h3 class="font-semibold text-gray-800">{{ title }}</h3>

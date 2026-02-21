@@ -145,15 +145,15 @@ async function delInt(id) {
 
     <div v-if="loading" class="text-gray-500">Carregando...</div>
     <div v-else class="grid gap-4">
-      <div v-for="s in items" :key="s.id" class="bg-white rounded-lg shadow-sm border p-4 flex items-center justify-between hover:border-brand-300">
-        <div class="flex items-center gap-4">
-          <Server class="w-8 h-8 text-brand-500 shrink-0" />
-          <div>
-            <p class="font-medium text-brand-800">{{ s.name }}</p>
-            <p class="text-sm text-gray-500">{{ s.hostname || '—' }} <span class="ml-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded capitalize">{{ s.environment }}</span></p>
+      <div v-for="s in items" :key="s.id" class="bg-white rounded-lg shadow-sm border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:border-brand-300">
+        <div class="flex items-center gap-4 min-w-0">
+          <Server class="w-6 h-6 sm:w-8 sm:h-8 text-brand-500 shrink-0" />
+          <div class="min-w-0">
+            <p class="font-medium text-brand-800 truncate">{{ s.name }}</p>
+            <p class="text-sm text-gray-500 truncate">{{ s.hostname || '—' }} <span class="ml-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded capitalize">{{ s.environment }}</span></p>
           </div>
         </div>
-        <div v-if="auth.isOperator" class="flex gap-1">
+        <div v-if="auth.isOperator" class="flex gap-1 shrink-0 justify-end sm:justify-start">
           <button @click="openEdit(s)" class="p-2 text-brand-500 hover:bg-brand-50 rounded" title="Editar"><Pencil class="w-4 h-4" /></button>
           <button v-if="auth.isAdmin" @click="doRemove(s.id)" class="p-2 text-red-500 hover:bg-red-50 rounded" title="Excluir"><Trash2 class="w-4 h-4" /></button>
         </div>
@@ -163,7 +163,7 @@ async function delInt(id) {
 
     <BaseModal v-if="showModal" :title="editId ? 'Editar Servidor' : 'Novo Servidor'" size="xl" @close="closeModal">
       <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm text-gray-600 mb-1">Nome</label>
             <input v-model="form.name" class="w-full border rounded px-3 py-2" />

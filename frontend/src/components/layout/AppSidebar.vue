@@ -1,7 +1,14 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import { useAuthStore } from '../../stores/auth'
+
+const sidebarOpenRef = inject('sidebarOpen', { value: false })
+const isSidebarOpen = computed(() => {
+  const v = sidebarOpenRef
+  return v && typeof v === 'object' && 'value' in v ? v.value : false
+})
 import {
   LayoutDashboard, Network, Server, Radio, Activity, Container, Bell, Settings,
   Users, Building2, Terminal,
@@ -46,8 +53,11 @@ function isActive(l) {
 </script>
 
 <template>
-  <aside class="w-56 bg-brand-800 min-h-screen flex flex-col">
-    <div class="p-4">
+  <aside
+    class="fixed lg:static inset-y-0 left-0 z-50 w-56 bg-brand-800 min-h-screen flex flex-col transform transition-transform duration-200 ease-out lg:transform-none"
+    :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+  >
+    <div class="p-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
       <RouterLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-white font-bold text-lg">ServerWatch</span>
       </RouterLink>

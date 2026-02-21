@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { Plus, Activity, Trash2, Play, Pencil } from 'lucide-vue-next'
 import BaseModal from '../components/ui/BaseModal.vue'
 import { useAuthStore } from '../stores/auth'
+import { fmtDateTime } from '../utils/date'
 
 const auth = useAuthStore()
 
@@ -125,15 +126,15 @@ function statusColor(s) {
 
     <div v-if="loading" class="text-gray-500">Carregando...</div>
     <div v-else class="grid gap-4">
-      <div v-for="c in items" :key="c.id" class="bg-white rounded-lg shadow-sm border p-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Activity class="w-8 h-8 text-brand-500 shrink-0" />
-          <div>
-            <p class="font-medium text-brand-800">{{ c.name }}</p>
-            <p class="text-sm text-gray-500">{{ c.check_type }} • {{ maskTarget(c) }}</p>
+      <div v-for="c in items" :key="c.id" class="bg-white rounded-lg shadow-sm border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex items-center gap-4 min-w-0">
+          <Activity class="w-6 h-6 sm:w-8 sm:h-8 text-brand-500 shrink-0" />
+          <div class="min-w-0">
+            <p class="font-medium text-brand-800 truncate">{{ c.name }}</p>
+            <p class="text-sm text-gray-500 truncate">{{ c.check_type }} • {{ maskTarget(c) }}</p>
           </div>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 shrink-0 justify-end sm:justify-start">
           <span :class="statusColor(c.last_status)" class="text-sm font-medium mr-1">{{ c.last_status || '–' }}</span>
           <button v-if="auth.isOperator" @click="doRun(c.id)" class="p-2 text-brand-500 hover:bg-brand-50 rounded" title="Executar agora"><Play class="w-4 h-4" /></button>
           <button v-if="auth.isOperator" @click="openEdit(c)" class="p-2 text-brand-500 hover:bg-brand-50 rounded" title="Editar"><Pencil class="w-4 h-4" /></button>
@@ -149,7 +150,7 @@ function statusColor(s) {
           <label class="block text-sm text-gray-600 mb-1">Nome</label>
           <input v-model="form.name" class="w-full border rounded px-3 py-2" required />
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm text-gray-600 mb-1">Tipo</label>
             <select v-model="form.check_type" class="w-full border rounded px-3 py-2">
@@ -158,6 +159,7 @@ function statusColor(s) {
               <option value="PING">Ping</option>
               <option value="TELNET">Telnet</option>
               <option value="DATABASE">Banco de dados</option>
+              <option value="SNMP">SNMP (threshold de métrica)</option>
             </select>
           </div>
           <div>
@@ -178,14 +180,20 @@ function statusColor(s) {
           <input
             v-model="form.target"
             class="w-full border rounded px-3 py-2"
-            :placeholder="form.check_type === 'DATABASE' ? 'mysql+pymysql://usuario:senha@host:3306/banco' : 'https://... ou host:porta'"
+            :placeholder="form.check_type === 'DATABASE' ? 'mysql+pymysql://usuario:senha@host:3306/banco' : form.check_type === 'SNMP' ? 'ROUTER_ID:METRIC_TYPE[:OP:VALOR] ex: 42:CPU:>:90' : 'https://... ou host:porta'"
             required
           />
           <p v-if="form.check_type === 'DATABASE'" class="mt-1 text-xs text-gray-500">
             MySQL: <code class="bg-gray-100 px-1">mysql+pymysql://user:pass@host:3306/db</code> | PG: <code class="bg-gray-100 px-1">postgresql://user:pass@host:5432/db</code>
           </p>
+          <p v-if="form.check_type === 'SNMP'" class="mt-1 text-xs text-gray-500">
+            Formato: <code class="bg-gray-100 px-1">ROUTER_ID:METRIC_TYPE:OPERADOR:VALOR</code>
+            <br/>Métricas: CPU, MEMORY, WIFI_CLIENTS, TRAFFIC_IN, TRAFFIC_OUT, UPTIME
+            <br/>Operadores: &gt;, &gt;=, &lt;, &lt;=
+            <br/>Ex: <code class="bg-gray-100 px-1">42:CPU:>:90</code> alerta se CPU do roteador 42 &gt; 90%
+          </p>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm text-gray-600 mb-1">Intervalo (s)</label>
             <input v-model.number="form.interval_sec" type="number" class="w-full border rounded px-3 py-2" />
@@ -204,9 +212,9 @@ function statusColor(s) {
         </button>
 
         <!-- Histórico (só ao editar) -->
-        <div v-if="editId && results.length" class="border-t pt-4 mt-2">
+        <div v-if="editId && results.length" class="border-t pt-4 mt-2 overflow-x-auto">
           <h4 class="font-medium text-sm mb-2">Últimos resultados</h4>
-          <table class="w-full text-sm">
+          <table class="w-full text-sm min-w-[320px]">
             <thead>
               <tr class="text-left text-gray-500 text-xs">
                 <th class="py-1">Data</th>
@@ -217,7 +225,7 @@ function statusColor(s) {
             </thead>
             <tbody>
               <tr v-for="r in results" :key="r.id" class="border-t">
-                <td class="py-1 text-xs text-gray-500">{{ new Date(r.checked_at).toLocaleString('pt-BR') }}</td>
+                <td class="py-1 text-xs text-gray-500">{{ fmtDateTime(r.checked_at) }}</td>
                 <td :class="r.status === 'OK' ? 'text-emerald-600' : 'text-red-600'" class="font-medium">{{ r.status }}</td>
                 <td class="text-gray-600">{{ r.latency_ms != null ? r.latency_ms + 'ms' : '–' }}</td>
                 <td class="text-gray-500 text-xs truncate max-w-[150px]">{{ r.message || '–' }}</td>

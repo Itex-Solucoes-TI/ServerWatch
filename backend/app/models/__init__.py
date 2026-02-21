@@ -10,3 +10,5 @@ from app.models.health_check import HealthCheck, CheckResult
 from app.models.company_settings import CompanySettings
 from app.models.notification import NotificationChannel, AlertRule
 from app.models.audit_log import AuditLog
+from app.models.snmp_metric import SnmpMetric
+from app.models.snmp_monitor import SnmpMonitor
