@@ -140,8 +140,14 @@ def _snmp_summary(routers, session: Session) -> dict:
         if key not in seen:
             seen[key] = m
 
-    router_map = {r.id: r.name for r in routers if r.snmp_enabled}
-    summary: dict[int, dict] = {rid: {"router_id": rid, "name": router_map[rid]} for rid in monitored_ids}
+    router_map = {r.id: {"name": r.name, "device_type": r.device_type} for r in routers if r.snmp_enabled}
+    summary: dict[int, dict] = {
+        rid: {"router_id": rid, "name": router_map[rid]["name"], "device_type": router_map[rid]["device_type"], "traffic": []}
+        for rid in monitored_ids
+    }
+
+    # Acumula tráfego por interface separadamente
+    traffic_seen: dict[tuple, dict] = {}  # (rid, iface) -> {in, out}
 
     total_clients = 0
     for (rid, mtype, iface), m in seen.items():
@@ -152,12 +158,18 @@ def _snmp_summary(routers, session: Session) -> dict:
         elif mtype == "WIFI_CLIENTS":
             summary[rid]["wifi_clients"] = int(m.value)
             total_clients += int(m.value)
-        elif mtype == "TRAFFIC_IN":
-            summary[rid].setdefault("traffic_in", 0)
-            summary[rid]["traffic_in"] += m.value
-        elif mtype == "TRAFFIC_OUT":
-            summary[rid].setdefault("traffic_out", 0)
-            summary[rid]["traffic_out"] += m.value
+        elif mtype in ("TRAFFIC_IN", "TRAFFIC_OUT"):
+            key = (rid, iface or "")
+            if key not in traffic_seen:
+                traffic_seen[key] = {"interface": iface or "", "in": None, "out": None}
+            if mtype == "TRAFFIC_IN":
+                traffic_seen[key]["in"] = m.value
+            else:
+                traffic_seen[key]["out"] = m.value
+
+    # Monta lista de tráfego por interface em cada roteador
+    for (rid, iface), t in traffic_seen.items():
+        summary[rid]["traffic"].append(t)
 
     # Inclui todos os roteadores com SNMP habilitado, mesmo sem métricas ainda
     router_list = list(summary.values())

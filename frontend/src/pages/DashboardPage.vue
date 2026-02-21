@@ -186,7 +186,13 @@ const fmtBytesShort = (bps) => {
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div v-for="r in data.snmp_summary.routers" :key="r.router_id" class="border rounded-lg p-3 text-sm space-y-2">
-            <p class="font-medium text-gray-800 truncate">{{ r.name }}</p>
+            <!-- Nome + tipo -->
+            <div>
+              <p class="font-medium text-gray-800 truncate">{{ r.name }}</p>
+              <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                {{ { ROUTER:'Roteador', WIFI_AP:'WiFi AP', SWITCH:'Switch', FIREWALL:'Firewall', OTHER:'Outro' }[r.device_type] || r.device_type || 'Roteador' }}
+              </span>
+            </div>
             <!-- CPU / Memória / WiFi -->
             <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
               <span v-if="r.cpu != null">
@@ -199,10 +205,13 @@ const fmtBytesShort = (bps) => {
                 WiFi <strong class="text-brand-700">{{ r.wifi_clients }}</strong>
               </span>
             </div>
-            <!-- Tráfego -->
-            <div v-if="r.traffic_in != null || r.traffic_out != null" class="flex gap-4 text-xs text-gray-600 border-t pt-2">
-              <span v-if="r.traffic_in != null">↓ <strong class="text-emerald-600">{{ fmtBytesShort(r.traffic_in) }}</strong></span>
-              <span v-if="r.traffic_out != null">↑ <strong class="text-orange-500">{{ fmtBytesShort(r.traffic_out) }}</strong></span>
+            <!-- Tráfego por interface -->
+            <div v-if="r.traffic?.length" class="border-t pt-2 space-y-1">
+              <div v-for="t in r.traffic" :key="t.interface" class="text-xs text-gray-600">
+                <span v-if="t.interface" class="text-gray-400 mr-1">{{ t.interface }}</span>
+                <span v-if="t.in != null">↓ <strong class="text-emerald-600">{{ fmtBytesShort(t.in) }}</strong></span>
+                <span v-if="t.out != null" class="ml-2">↑ <strong class="text-orange-500">{{ fmtBytesShort(t.out) }}</strong></span>
+              </div>
             </div>
           </div>
         </div>
